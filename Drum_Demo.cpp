@@ -74,10 +74,10 @@ class Hihat : public SynthVoice {
   gam::Pan<> mPan;
   gam::AD<> mAmpEnv; // Changed amp envelope from Env<3> to AD<>
   
-  gam::Burst mBurst;
+  gam::Burst mBurst; // Resonant noise with exponential decay
 
   void init() override {
-    // Initialize burst 
+    // Initialize burst - Main freq, filter freq, duration
     mBurst = gam::Burst(20000, 15000, 0.05);
 
   }
@@ -104,21 +104,19 @@ class Snare : public SynthVoice {
  public:
   // Unit generators
   gam::Pan<> mPan;
-  gam::AD<> mAmpEnv;
-  gam::Sine<> mOsc;
-  gam::Sine<> mOsc2;
-  gam::Decay<> mDecay;
+  gam::AD<> mAmpEnv; // Amplitude envelope
+  gam::Sine<> mOsc; // Main pitch osc (top of drum)
+  gam::Sine<> mOsc2; // Secondary pitch osc (bottom of drum)
+  gam::Decay<> mDecay; // Pitch decay for oscillators
   gam::ReverbMS<> reverb;	// Schroeder reverberator
-
-  
-  // Noise to simulate chains
-  gam::Burst mBurst;
+  gam::Burst mBurst; // Noise to simulate rattle/chains
 
 
   void init() override {
     // Initialize burst 
     mBurst = gam::Burst(10000, 5000, 0.3);
 
+    // Initialize amplitude envelope
     mAmpEnv.attack(0.01);
     mAmpEnv.decay(0.01);
     mAmpEnv.amp(1.0);
@@ -127,10 +125,8 @@ class Snare : public SynthVoice {
     mDecay.decay(0.8);
 
     reverb.resize(gam::FREEVERB);
-    // Set decay length, in seconds
-		reverb.decay(0.2);
-    // Set high-frequency damping factor in [0, 1]
-		reverb.damping(0.2);
+		reverb.decay(0.5); // Set decay length, in seconds
+		reverb.damping(0.2); // Set high-frequency damping factor in [0, 1]
 
   }
 
@@ -140,6 +136,9 @@ class Snare : public SynthVoice {
     mOsc2.freq(150);
 
     while (io()) {
+      
+      // Each mDecay() call moves it forward (I think), so we only want
+      // to call it once per sample
       float decay = mDecay();
       mOsc.freqMul(decay);
       mOsc2.freqMul(decay);
@@ -166,6 +165,9 @@ class MyApp : public App {
  public:
   SynthGUIManager<Kick> synthManager{"Kick"};
 
+  // Set to 'true' if using samples
+  bool hasSample = false; 
+
   // Added SamplePlayer to mix in external audio clips
   gam::SamplePlayer<> samplePlayer;
   bool paused = true;
@@ -191,15 +193,15 @@ class MyApp : public App {
     synthManager.synthRecorder().verbose(true);
 
     // Load audio sample
-    samplePlayer.load("guitartest.wav");
-   // samplePlayer.loop();
+    if(hasSample) samplePlayer.load("guitartest.wav");
+
   }
 
   void onSound(AudioIOData& io) override {
     synthManager.render(io);  // Render audio
     
     // After rendering synths, 
-    while(io() && !paused){  
+    while(io() && !paused && hasSample){  
       float s = samplePlayer();
       io.out(0) +=  s;
       io.out(1) += s;
@@ -220,12 +222,10 @@ class MyApp : public App {
   }
 
   bool onKeyDown(Keyboard const& k) override {
-    // pressing space starts audio clip
-    //if(k.key() == ' ') paused = !paused;
     
     // testing grounds
-    if(k.key() == 'e') playHihat(0, 0.1);
-    if(k.key() == 'w') playSnare(0, 0.2);
+    if(k.key() == 'e') playSnare(0, 0.2);
+    if(k.key() == 'w') playSnare(0, 2);
     if(k.key() == 'q') playKick(150, 0, 0.4, 0.9);
 
     if(k.key() == '1') playKick(50, 0, 0.4, 0.9);
@@ -243,9 +243,11 @@ class MyApp : public App {
       playBackbeat(110, 1, 'b');
       playBackbeat(110, 2);
       playBackbeat(110, 3, 'b');
-      samplePlayer.reset();
-
-      paused = false;
+      if(hasSample){
+        samplePlayer.reset();
+        paused = false;
+      }
+      
     }
     if(k.key() == 's'){
       samplePlayer.reset();
@@ -341,12 +343,6 @@ class MyApp : public App {
     float beat = 60./tempo;
     float offset = 4*bar*beat;
 
-    // playHihat(0.5*beat+offset);
-    // playHihat(1.5*beat+offset);
-    // playHihat(2.5*beat+offset);
-    // playHihat(3.5*beat+offset);
-
-
     playKick(150, 0*beat+offset, 0.4, 0.9);
     playKick(150, 1*beat+offset, 0.4, 0.9);
     playKick(150, 2*beat+offset, 0.4, 0.9);
@@ -356,7 +352,6 @@ class MyApp : public App {
     playSnare(1.5*beat+offset, 0.1);
     playSnare(2.75*beat+offset, 0.1);
     playSnare(3.5*beat+offset, 0.1);
-   // playSnare(3*beat+offset, 0.1);
   }
 
 
