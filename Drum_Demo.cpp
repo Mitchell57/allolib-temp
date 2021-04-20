@@ -192,7 +192,7 @@ class MyApp : public App {
     //    synthManager.synthSequencer().playSequence("synth4.synthSequence");
     synthManager.synthRecorder().verbose(true);
 
-    // Load audio sample
+    // Load audio sample (files go in bin folder)
     if(hasSample) samplePlayer.load("guitartest.wav");
 
   }
