@@ -4,6 +4,7 @@
 #include "Gamma/Envelope.h"
 #include "Gamma/Gamma.h"
 #include "Gamma/Oscillator.h"
+#include "Gamma/Spatial.h"
 #include "Gamma/Types.h"
 #include "Gamma/SamplePlayer.h"
 
@@ -105,7 +106,9 @@ class Snare : public SynthVoice {
   gam::Pan<> mPan;
   gam::AD<> mAmpEnv;
   gam::Sine<> mOsc;
+  gam::Sine<> mOsc2;
   gam::Decay<> mDecay;
+  gam::ReverbMS<> reverb;	// Schroeder reverberator
 
   
   // Noise to simulate chains
@@ -123,15 +126,27 @@ class Snare : public SynthVoice {
     // Initialize pitch decay 
     mDecay.decay(0.8);
 
+    reverb.resize(gam::FREEVERB);
+    // Set decay length, in seconds
+		reverb.decay(0.2);
+    // Set high-frequency damping factor in [0, 1]
+		reverb.damping(0.2);
+
   }
 
   // The audio processing function
   void onProcess(AudioIOData& io) override {
-    mOsc.freq(250);
+    mOsc.freq(200);
+    mOsc2.freq(150);
 
     while (io()) {
-      mOsc.freqMul(mDecay());
-      float s1 = mBurst() + (mOsc() * mAmpEnv() * 0.1);
+      float decay = mDecay();
+      mOsc.freqMul(decay);
+      mOsc2.freqMul(decay);
+
+      float amp = mAmpEnv();
+      float s1 = mBurst() + (mOsc() * amp * 0.1)+ (mOsc2() * amp * 0.05);
+      s1 += reverb(s1) * 0.2;
       float s2;
       mPan(s1, s1, s2);
       io.out(0) += s1;
@@ -152,8 +167,8 @@ class MyApp : public App {
   SynthGUIManager<Kick> synthManager{"Kick"};
 
   // Added SamplePlayer to mix in external audio clips
-  // gam::SamplePlayer<> samplePlayer;
-  // bool paused = true;
+  gam::SamplePlayer<> samplePlayer;
+  bool paused = true;
 
   ParameterMIDI parameterMIDI;
   int midiNote;
@@ -176,19 +191,19 @@ class MyApp : public App {
     synthManager.synthRecorder().verbose(true);
 
     // Load audio sample
-    // samplePlayer.load("test2.wav");
-    // samplePlayer.loop();
+    samplePlayer.load("guitartest.wav");
+   // samplePlayer.loop();
   }
 
   void onSound(AudioIOData& io) override {
     synthManager.render(io);  // Render audio
     
     // After rendering synths, 
-    // while(io() && !paused){  
-    //   float s = samplePlayer();
-    //   io.out(0) +=  s*0.6;
-    //   io.out(1) += s*0.6;
-	  // }
+    while(io() && !paused){  
+      float s = samplePlayer();
+      io.out(0) +=  s;
+      io.out(1) += s;
+	  }
   }
 
   void onAnimate(double dt) override {
@@ -211,10 +226,38 @@ class MyApp : public App {
     // testing grounds
     if(k.key() == 'e') playHihat(0, 0.1);
     if(k.key() == 'w') playSnare(0, 0.2);
-    if(k.key() == 'q') playKick(100, 0, 0.4, 0.9);
-    if(k.key() == 'd') playBeat(110);
-    
-    
+    if(k.key() == 'q') playKick(150, 0, 0.4, 0.9);
+
+    if(k.key() == '1') playKick(50, 0, 0.4, 0.9);
+    if(k.key() == '2') playKick(100, 0, 0.4, 0.9);
+    if(k.key() == '3') playKick(150, 0, 0.4, 0.9);
+    if(k.key() == '4') playKick(200, 0, 0.4, 0.9);
+    if(k.key() == '5') playKick(250, 0, 0.4, 0.9);
+    if(k.key() == '6') playKick(300, 0, 0.4, 0.9);
+
+    if(k.key() == 'g') playReggaeton(96,0);
+
+    if(k.key() == 'd') playBackbeat(110);
+    if(k.key() == 'a') {
+      playBackbeat(110, 0);
+      playBackbeat(110, 1, 'b');
+      playBackbeat(110, 2);
+      playBackbeat(110, 3, 'b');
+      samplePlayer.reset();
+
+      paused = false;
+    }
+    if(k.key() == 's'){
+      samplePlayer.reset();
+      paused = false;
+    }
+
+    if(k.key() == 'h'){
+      for(int i=0; i<4; i++){
+        playHouse(140, i);
+      }
+    }
+
     return true;
   }
 
@@ -252,31 +295,68 @@ class MyApp : public App {
       synthManager.synthSequencer().addVoiceFromNow(voice, time, duration);
   }
 
-  void playBeat(float tempo){
+  void playBackbeat(float tempo, int bar=0, char take='a'){
     float beat = 60./tempo;
+    float offset = 4*bar*beat;
 
+    for(int i=0; i<8; i++){
+      float time = (i/2.)*beat;
+      playHihat(time+offset);
+    }
 
+    switch(take){
+      case 'a':
+        playKick(100, 0*beat+offset, 0.4, 0.9);
+        playKick(100, 2*beat+offset, 0.4, 0.9);
+        break;
+      case 'b':
+        playKick(100, 0*beat+offset, 0.4, 0.9);
+        playKick(100, 2*beat+offset, 0.4, 0.9);
+        playKick(100, 2.5*beat+offset, 0.4, 0.9);
+        break;
+    }
     
-    playKick(100, 0*beat, 0.4, 0.9);
-    playHihat(0*beat);
+    playSnare(1*beat+offset, 0.1);
+    playSnare(3*beat+offset, 0.1);
+  }
 
-    playHihat(0.5*beat);
+  void playHouse(float tempo, int bar=0){
+    float beat = 60./tempo;
+    float offset = 4*bar*beat;
 
-    playSnare(1*beat, 0.1);
-    playHihat(1*beat);
+    playHihat(0.5*beat+offset);
+    playHihat(1.5*beat+offset);
+    playHihat(2.5*beat+offset);
+    playHihat(3.5*beat+offset);
 
-    playHihat(1.5*beat);
 
-    playKick(100, 2*beat, 0.4, 0.9);
-    playHihat(2*beat);
+    playKick(100, 0*beat+offset, 0.4, 0.9);
+    playKick(100, 2.5*beat+offset, 0.4, 0.9);
+    playKick(100, 3.5*beat+offset, 0.4, 0.9);
+    playSnare(1*beat+offset, 0.1);
+    playSnare(3*beat+offset, 0.1);
+  }
 
-    playKick(100, 2.5*beat, 0.4, 0.9);
-    playHihat(2.5*beat);
+  void playReggaeton(float tempo, int bar=0){
+    float beat = 60./tempo;
+    float offset = 4*bar*beat;
 
-    playSnare(3*beat, 0.1);
-    playHihat(3*beat);
+    // playHihat(0.5*beat+offset);
+    // playHihat(1.5*beat+offset);
+    // playHihat(2.5*beat+offset);
+    // playHihat(3.5*beat+offset);
 
-    playHihat(3.5*beat);
+
+    playKick(150, 0*beat+offset, 0.4, 0.9);
+    playKick(150, 1*beat+offset, 0.4, 0.9);
+    playKick(150, 2*beat+offset, 0.4, 0.9);
+    playKick(150, 3*beat+offset, 0.4, 0.9);
+
+    playSnare(0.75*beat+offset, 0.1);
+    playSnare(1.5*beat+offset, 0.1);
+    playSnare(2.75*beat+offset, 0.1);
+    playSnare(3.5*beat+offset, 0.1);
+   // playSnare(3*beat+offset, 0.1);
   }
 
 
