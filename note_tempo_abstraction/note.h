@@ -7,6 +7,41 @@
 #include <assert.h>  
 #include <regex>
 
+/*--------------------------------------------------
+
+note = Note("Db5") or Note(63) or Note('G', '#', 2)
+
+note.midi()      > [0, 127]
+note.octave()    > [-1, 9]
+note.name()      > e.g. "Eb4"
+note.key()       > e.g. "Eb"
+note.frequency() >  622.254
+
+note.distanceTo(note2)       > (int) num semitones
+note.interval(type)          > (Note) 
+note.chord(type, inversion)  > returns vector<Note> 
+note.scale(type)             > returns vector<Note> 
+
+scales: 
+    Major, Minor, Pentatonic
+
+chords:
+    Maj, min, 
+    Aug, Dim, 
+    Maj7, min7, 
+    Dom7, Dom9,
+    sus2, sus4,
+    Maj11
+
+intervals: 
+    perfect: P1, P5, P8
+    minor: m2, m3, m6, m7 
+    major: M2, M3, M6, M7 
+    diminished: d2, d3, d4, d5, d6, d7, d8 
+    augmented: A1, A2, A3, A4, A5, A6, A7
+
+--------------------------------------------------*/
+
 const static int numChords = 11;
 const static int maxChordLength = 6;
 const static int chord_table[numChords][maxChordLength] = {
@@ -168,7 +203,7 @@ class Note {
         // direction = -1 for down
         Note interval(interval_type type, int direction=1){
             int interval = interval_table[type] * direction;
-            Note n = Note(this->index + interval);
+            Note n = Note(index + interval);
             return n;
         }
         
@@ -186,21 +221,11 @@ class Note {
                 }
             }
 
-            // 1st inversion - move root up an octave
-            if(inv == 1){
-                Note root = ret[0];
-                root.set(root.midi()+12);
+            for(int i=0; i<inv; i++){
+                ret[0].set(ret[0].index+12);
                 std::rotate(ret.begin(), ret.begin() + 1, ret.end());
             }
 
-            // 2nd inversion - move first two notes up an octave
-            else if(inv == 2){
-                Note root = ret[0];
-                Note one = ret[1];
-                root.set(root.midi()+12);
-                one.set(one.midi()+12);
-                std::rotate(ret.begin(), ret.begin() + 2, ret.end());
-            }
             return ret;
         }
 
@@ -418,43 +443,7 @@ class Note {
 
 };
 
-/*--------------------------------------------------
-
-example: translation
-
-note = Note("Db5") or Note(63) or Note('G', '#', 2)
-
-note.midi()      > [0, 127]
-note.octave()    > [-1, 9]
-note.name()      > e.g. "Eb4"
-note.key()       > e.g. "Eb"
-note.frequency() >  622.254
-
-note.distanceTo(note2)       > (int) num semitones
-note.interval(type)          > (Note) 
-note.chord(type, inversion)  > returns vector<Note> 
-note.scale(type)             > returns vector<Note> 
-
-scales: 
-    Major, Minor, Pentatonic
-
-chords:
-    Maj, min, 
-    Aug, Dim, 
-    Maj7, min7, 
-    Dom7, Dom9,
-    sus2, sus4,
-    Maj11
-
-intervals: 
-    perfect: P1, P5, P8
-    minor: m2, m3, m6, m7 
-    major: M2, M3, M6, M7 
-    diminished: d2, d3, d4, d5, d6, d7, d8 
-    augmented: A1, A2, A3, A4, A5, A6, A7
-
---------------------------------------------------
-
+/*
 example use: modulate key and octave
 
 playSong(key, sign, octave){
