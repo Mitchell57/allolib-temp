@@ -207,7 +207,7 @@ public:
       return time+duration;
   }
 
-  void playHappyBirthday(Note root, float tempo)
+  void playHappyBirthday(Note root, float bpm)
   {
     // Happy birthday uses: P1(C), M2(D), M3(E), P4(F), P5(G), M6(A), and m7(Bb)
     std::vector<Note> majScale = root.scale(Note::Major);
@@ -229,9 +229,9 @@ public:
     std::vector<Note> chord4 = P4.chord(Note::Maj, 2); // 2nd inversion
 
     // Now lets set up a tempo
-    //  syntax: Tempo(bpm, time signature top, time signature bottom)
+    //  syntax: Tempo(bpm, timeSig top, timeSig bottom)
     float time = 0;
-    Tempo t(tempo, 3, 4); 
+    Tempo t(bpm, 3, 4); 
     // this allows us to say get exact durations for common note types
 
     time = playNote(time, root, t.duration(Tempo::eighth, true)); // true = dotted note
@@ -247,33 +247,33 @@ public:
     time = playNote(time, root, t.duration(Tempo::eighth, true)); // true = dotted note
     time = playNote(time, root, t.duration(Tempo::sixteenth));
 
-    time = playNote(time, M2, t.duration(Tempo::quarter)); 
-    time = playNote(time, root, t.duration(Tempo::quarter)); 
-    time = playNote(time, P5, t.duration(Tempo::quarter)); 
+    time = playNote(time, M2, t.duration(Tempo::q)); 
+    time = playNote(time, root, t.duration(Tempo::q)); 
+    time = playNote(time, P5, t.duration(Tempo::q)); 
 
-    playChord(time, chord1, t.duration(Tempo::half));
-    time = playNote(time, P4, t.duration(Tempo::half)); 
-    time = playNote(time, root, t.duration(Tempo::eighth, true)); // true = dotted note
-    time = playNote(time, root, t.duration(Tempo::sixteenth));
+    playChord(time, chord1, t.duration(Tempo::h));
+    time = playNote(time, P4, t.duration(Tempo::h)); 
+    time = playNote(time, root, t.duration(Tempo::e, true)); // true = dotted note
+    time = playNote(time, root, t.duration(Tempo::s));
 
-    time = playNote(time, P8, t.duration(Tempo::quarter)); 
-    time = playNote(time, M6, t.duration(Tempo::quarter)); 
-    time = playNote(time, P4, t.duration(Tempo::quarter)); 
+    time = playNote(time, P8, t.duration(Tempo::q)); 
+    time = playNote(time, M6, t.duration(Tempo::q)); 
+    time = playNote(time, P4, t.duration(Tempo::q)); 
 
-    playChord(time, chord3, t.duration(Tempo::half));
-    time = playNote(time, M3, t.duration(Tempo::quarter)); 
-    time = playNote(time, M2, t.duration(Tempo::quarter)); 
-    time = playNote(time, m7, t.duration(Tempo::eighth, true)); // true = dotted note
-    time = playNote(time, m7, t.duration(Tempo::sixteenth));
+    playChord(time, chord3, t.duration(Tempo::h));
+    time = playNote(time, M3, t.duration(Tempo::q)); 
+    time = playNote(time, M2, t.duration(Tempo::q)); 
+    time = playNote(time, m7, t.duration(Tempo::e, true)); // true = dotted note
+    time = playNote(time, m7, t.duration(Tempo::s));
 
-    playChord(time, chord4, t.duration(Tempo::half));
-    time = playNote(time, M6, t.duration(Tempo::quarter)); 
-    time = playNote(time, P4, t.duration(Tempo::quarter)); 
-    playChord(time, chord2, t.duration(Tempo::quarter));   
-    time = playNote(time, P5, t.duration(Tempo::quarter));  
+    playChord(time, chord4, t.duration(Tempo::h));
+    time = playNote(time, M6, t.duration(Tempo::q)); 
+    time = playNote(time, P4, t.duration(Tempo::q)); 
+    playChord(time, chord2, t.duration(Tempo::q));   
+    time = playNote(time, P5, t.duration(Tempo::q));  
 
-    playChord(time, chord1, t.duration(Tempo::half));
-    time = playNote(time, P4, t.duration(Tempo::half)); 
+    playChord(time, chord1, t.duration(Tempo::h));
+    time = playNote(time, P4, t.duration(Tempo::h)); 
 
   }
 
