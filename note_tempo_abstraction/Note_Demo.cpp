@@ -5,7 +5,6 @@
 #include "al/ui/al_ControlGUI.hpp"
 #include "al/ui/al_Parameter.hpp"
 
-#include "helpers.h"
 #include "note.h"
 
 // using namespace gam;
@@ -184,15 +183,12 @@ class MyApp : public App {
                 if(name == "l"){
                   cout << "\nMaj, min, Dim, Aug, Maj7, min7, Dom7  |  Inversion [0-2]\n" << endl;
                 }
-                
-                
-                
-                
+
                 else{
                   cin >> inv;
                   std::vector<Note> chord;
                   if(name=="Maj") chord = n.chord(Note::Maj, inv);
-                  if(name=="minor") chord = n.chord(Note::min, inv);
+                  if(name=="min") chord = n.chord(Note::min, inv);
                   if(name=="Dim") chord = n.chord(Note::Dim, inv);
                   if(name=="Aug") chord = n.chord(Note::Aug, inv);
                   if(name=="Maj7") chord = n.chord(Note::Maj7, inv);

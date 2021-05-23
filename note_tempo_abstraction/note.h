@@ -7,169 +7,123 @@
 #include <assert.h>  
 #include <regex>
 
-/*--------------------------------------------------
+#include "notehelpers.h"
 
-note = Note("Db5") or Note(63) or Note('G', '#', 2)
+namespace theory {
+/*------------------------------------------------------------------------------
 
-note.midi()      > [0, 127]
-note.octave()    > [-1, 9]
-note.name()      > e.g. "Eb4"
-note.key()       > e.g. "Eb"
-note.frequency() >  622.254
+Note - an music theory abstraction for high-level composition
 
-note.distanceTo(note2)       > (int) num semitones
-note.interval(type)          > (Note) 
-note.chord(type, inversion)  > returns vector<Note> 
-note.scale(type)             > returns vector<Note> 
+    Constructors --------------------------------------------------
+        Note(string name): e.g. Note("Db5")
 
-scales: 
-    Major, Minor, Pentatonic
+        Note(int midi): e.g. Note(63)
 
-chords:
-    Maj, min, 
-    Aug, Dim, 
-    Maj7, min7, 
-    Dom7, Dom9,
-    sus2, sus4,
-    Maj11
+        Note(char key, char sign='n', int octave=4, signPref='b')
+            signPref = whether scales/chords names should use sharps or flats
 
-intervals: 
-    perfect: P1, P5, P8
-    minor: m2, m3, m6, m7 
-    major: M2, M3, M6, M7 
-    diminished: d2, d3, d4, d5, d6, d7, d8 
-    augmented: A1, A2, A3, A4, A5, A6, A7
+    Descriptors --------------------------------------------------
+        note.midi()      
+            > (int) [0, 127]
 
---------------------------------------------------*/
+        note.octave()    
+            > (int) [-1, 9]
 
-const static int numChords = 11;
-const static int maxChordLength = 6;
-const static int chord_table[numChords][maxChordLength] = {
-    {0, 4, 7, -1,-1,-1},   // Major
-    {0, 3, 7, -1,-1,-1},   // Minor
-    {0, 3, 6,- 1,-1,-1},   // Diminished
-    {0, 4, 7, 11, -1,-1},  // Maj7
-    {0, 3, 7, 10, -1,-1},  // Minor7
-    {0, 4, 7, 10, -1,-1},  // Dom7
-    {0, 2, 7, -1,-1,-1},   // Sus2
-    {0, 5, 7, -1,-1,-1},   // Sus4
-    {0, 4, 8, -1,-1,-1},   // Aug
-    {0, 4, 7, 10, 14, -1}, // Dom9
-    {0, 4, 7, 11, 14, 17}, // Maj11
-};
+        note.name()      
+            > (string) "Eb4"
 
-const static int numScales = 3;
-const static int maxScaleLength = 8;
-const static int scale_table[numScales][maxScaleLength] = {
-    {0, 2, 4, 5, 7, 9, 11, 12}, // Major
-    {0, 2, 3, 5, 7, 8, 10, 12}, // Minor
-    {0, 2, 4, 7, 9, 12, -1, -1} // Pentatonic          
-};
+        note.key()       
+            > (string) "Eb"
 
-const static int numIntervals = 26;
-const static int interval_table[numIntervals] = {
-    0, 5, 7, 12,          // Perfect
-    1, 3, 8, 10,          // Minor
-    2, 4, 9, 11,          // Major
-    0, 2, 4, 6, 7, 9, 11, // Diminished
-    1, 3, 5, 6, 8, 10, 12 // Augmented
-};
+        note.frequency() 
+            > (float) 622.254
+        
+        note.distanceTo(note2)       
+            > returns num semitones (int)
 
+    Modifiers --------------------------------------------------
+        note.set(string name)
+        note.set(int midi)
+        note.set(char key, char sign='n', int octave=4)
+
+        note.setOctave(int octave)
+            > returns true if successful
+
+        note.setKey(string name)
+        note.setKey(char key, char sign)
+            > returns true if successful
+
+        
+
+    Extrapolators --------------------------------------------------
+        
+        note.interval(interval_type, int direction) direction: 1 or -1
+        note.interval(int distance)
+            > returns Note at interval
+
+        note.octaveDown()
+        note.octaveUp()
+            > returns Note one octave higher/lower
+
+        note.scale_degree(scale_type, scale_degree)
+        note.scale_degree(scale_type, int degree)             
+            > returns Note 
+
+        chord(Note root, string chord_name, int inversion)
+        chord(string chord_name, int inversion)
+            > returns chord (notelist)
+        
+        scale(Note tonic, scale_type)
+        scale(string tonic_name, scale_type)             
+            > returns scale (notelist)
+        
+        scale_degree(notelist scale, scale_degree)
+        scale_degree(notelist scale, int degree)
+            > returns Note
+
+        scale_chord(notelist scale, scale_degree)
+        scale_chord(notelist scale, int degree, int length)
+            > returns chord (notelist)
+
+             
+------------------------------------------------------------------------------*/
 class Note {
     public:
         char signPref;
         int index;
 
-        struct parsed_string{
-            char note, sign;
-            int octave;
-        };
+        typedef std::vector<Note> notelist;
 
-        // Type enums must be in same order as table declarations
-        enum scale_type {Major, Minor, Pent};
-
-        enum chord_type {Maj, min, Dim, Maj7, min7, Dom7, sus2, sus4, Aug, Dom9, Maj11};
-        
-        enum interval_type {
-            P1, P4, P5, P8, 
-            m2, m3, m6, m7, 
-            M2, M3, M6, M7,
-            d2, d3, d4, d5, d6, d7, d8,
-            A1, A2, A3, A4, A5, A6, A7
-        };
-        
-        // default constructor
-        //  Note(), Note('C'), Note('C', '#'), Note('C', 2), Note('C', '#', 2)
+        //  constructor
         Note(char note='A', char sign='n', int octave=4, char signPref='b'){ 
-            parsed_string parsed = {note, sign, octave};
-            init(parsedToMidi(parsed), signPref);
+            helper::parsed_str parsed = {note, sign, octave};
+            init(helper::parsedToMidi(parsed), signPref);
         }
-
-        // string constructor
-        //  Note("C"), Note("C2"), Note("G#5") = G#5
-        Note(std::string input, char signPref='n'){ 
-            this->set(input, signPref);
-        }
-
-        // midi constructor
-        //  Note(69), Note(70, '#' or 'b')
+        Note(std::string input, char signPref='n'){ this->set(input, signPref); }
         Note(int midi, char signPref='b'){ init(midi, signPref); }
 
         // Main initializer
         void init(int midi, char signPref){
-            if(midi > 127 || midi <0){
+            if(midi > 127 || midi <0)
+            {
                 throw std::out_of_range("Note(midi) : midi index ("+std::to_string(midi)+") is out of range");
             }
             
             this->index = midi;
             this->signPref = signPref;
         }
-
-        // Re-initializers
-        void set(int midi, char signPref='b'){ init(midi, signPref); }
-
-        void set(std::string input, char signPref='n'){ 
-            parsed_string parsed = parseString(input);
-            if(signPref == 'n'){
-                if(parsed.sign == '#') { init(parsedToMidi(parsed), '#'); }
-                else{ init(parsedToMidi(parsed), 'b'); }
-            }
-            else{ init(parsedToMidi(parsed), signPref); } 
-        }
-        
-        void set(char note='A', char sign='n', int octave=4, char signPref='b'){ 
-            parsed_string parsed = {note, sign, octave};
-            init(parsedToMidi(parsed), signPref);
-        }
-
-        void setSignPref(char s){ 
-            std::regex sign_regex("[#nb]");
-            assert(regex_match(std::to_string(s), sign_regex));
-
-            this->signPref = s; 
-        }
-
-        void setOctave(int octave=4){
-            assert(octave > -2 && octave < 10);
-            int noteIdx = this->index%12;
-            int offset = (octave+1)*12;
-
-            this->index = noteIdx + offset;
-
-        }
-
 // ------------------------------------------------------------------
-//      Access / Translation
+//      Descriptors
 // ------------------------------------------------------------------     
 
         // returns full note name (e.g. "Db6")
         std::string name(){
-            return midiToString(this->index, this->signPref);
+            return helper::midiToString(this->index, this->signPref);
         }
 
         // returns key without octave (e.g. "Db")
         std::string key(){
-            return midiToString(this->index, this->signPref, false);
+            return helper::midiToString(this->index, this->signPref, false);
         }
 
         // returns midi index
@@ -185,298 +139,335 @@ class Note {
             return (float)(root*pow(multiplier, distance));
         }
 
+        // returns octave [-1, 9]
         int octave(){
             return (this->midi()/12)-1;
         }
 
+// ------------------------------------------------------------------
+//      Modifiers
+// ------------------------------------------------------------------  
+        
+        // set note to new midi index [0-127]
+        void set(int midi, char signPref='b'){ init(midi, signPref); }
+
+        // set note to new string name
+        void set(std::string input, char signPref='n')
+        { 
+            helper::parsed_str parsed = helper::parseString(input);
+            int idx = helper::parsedToMidi(parsed);
+            if(signPref == 'n'){
+                if(parsed.sign == '#') { init(idx, '#'); }
+                else{ init(idx, 'b'); }
+            }
+            else{ init(idx, signPref); } 
+        }
+        
+        // set note to new key, sign, and octave
+        void set(char key='A', char sign='n', int octave=4, char signPref='b'){ 
+            helper::parsed_str parsed = {key, sign, octave};
+            init(helper::parsedToMidi(parsed), signPref);
+        }
+
+        // set octave of note without changing key
+        bool setOctave(int octave=4){
+            if(octave < -1 && octave > 9) return false;
+            int noteIdx = this->index%12;
+            int offset = (octave+1)*12;
+            this->index = noteIdx + offset;
+
+            return true;
+        }
+
+        // set key of note without changing octave
+        bool setKey(std::string key){
+            int octave = this->octave();
+            this->set(key);
+            return this->setOctave(octave);
+        }
+
+        // set key of note without changing octave
+        bool setKey(char key, char sign){
+            int octave = this->octave();
+            this->set(key, sign, octave);
+            return true;
+        }
+
+        // moves note up an octave
+        bool octaveUp(){
+            int newIdx = this->index + 12;
+            if(newIdx > 0 && newIdx < 128){
+                this->set(newIdx);
+                return true;
+            }
+
+            return false;
+        }
+
+        // moves note down an octave
+        bool octaveDown(){
+            int newIdx = this->index - 12;
+            if(newIdx > 0 && newIdx < 128){
+                this->set(newIdx);
+                return true;
+            }
+            return false;
+        }
+
+// ------------------------------------------------------------------
+//      Extrapolators
+// ------------------------------------------------------------------
+
+        notelist chord(std::string chord_name, int octave=3);
+        
         // returns distance (in semitones) to another note
         int distanceTo(Note* b){
             return b->midi() - this->index;
         }
 
-// ------------------------------------------------------------------
-//      Intervals / Chords / Scales
-// ------------------------------------------------------------------
-
         // returns note at specified interval above/below current note
         // direction = 1 for up
         // direction = -1 for down
-        Note interval(interval_type type, int direction=1){
-            int interval = interval_table[type] * direction;
+        Note interval(interval_type::name type, int direction=1){
+            int interval = interval_type::table[type] * direction;
             Note n = Note(index + interval);
+            return n;
+        }
+
+        // returns note at specified interval above/below current note
+        Note interval(int semitones){
+            Note n = Note(index + semitones);
             return n;
         }
         
         // returns vector of Notes corresponding to root note, chord type, and inversion
-        std::vector<Note> chord(chord_type type, int inv=0){
-            std::vector<Note> ret;
+        // chord name structure: 
+        //      [root][quality][extension][alteration][add][bass]
+        //
+        // quality: 
+        //      maj, min, aug, dim, dom, sus2, sus4
+        // extension: 
+        //      7, 9, 11, or 13
+        // alteration: 
+        //      b5, #5, b9, #9
+        // add: 
+        //      add2, add4, add6, add8, add9
+        // bass: 
+        //      /[key] where key is a note in chord (inverts so that key is the lowest note in chord)
+        //      e.g. note.getChord("maj7"), note.getChord("m7b5"), note.getChord("Madd5")   
+        
+
+        notelist getScale(scale_type::name type){
+            notelist ret;
 
             // loop through chord intervals to build list of notes
-            for(int i=0; i<maxChordLength; i++){
-                int interval = chord_table[type][i];
-                if(interval >= 0 ){ // variable length chords, fixed length array, filled space with -1s
+            for(int i=0; i<scale_type::maxLength; i++){
+                int interval = scale_type::table[type][i];
+                if(interval >= 0 ){ // variable length scales, fixed length array, filled space with -1s
                     int idx = this->index + interval;
                     Note cnote = Note(idx, signPref);
                     ret.push_back(cnote);
                 }
             }
 
-            for(int i=0; i<inv; i++){
-                ret[0].set(ret[0].index+12);
-                std::rotate(ret.begin(), ret.begin() + 1, ret.end());
-            }
-
             return ret;
         }
 
-        std::vector<Note> scale(scale_type type=Major){
-            std::vector<Note> ret;
-            for(int i=0; i<maxScaleLength; i++){
-                int interval = scale_table[type][i];
-                if(interval == -1) break;
-                else{
-                    Note snote = Note(this->index + interval, signPref);
-                    ret.push_back(snote);
-                }
+        // Returns note at degree on scale 
+        Note scale_degree(scale_type::name type, scale_type::degree degree){
+            int interval = scale_type::table[type][degree];
+            
+            if(interval > 0){
+                return Note(this->index+interval);
             }
-            return ret;
+            else return Note(this->index);
         }
 
-// ------------------------------------------------------------------
-//      Utility
-// ------------------------------------------------------------------
-        
-        // takes string input
-        // returns Midi index if valid
-        static int stringToMidi(std::string str){
-            parsed_string parsed = parseString(str);
-            
-            return parsedToMidi(parsed);
-        }
-
-        // takes string input
-        // returns {note, sign, octave} if valid
-        static Note::parsed_string parseString(std::string str){
-            std::regex note_regex("[a-gA-G]");
-            std::regex sign_regex("[#nb]");
-            std::regex octave_regex("\\-1|[0-9]");
-            
-            std::string toParse = str;
-            parsed_string ret;
-
-            if(str.length() < 1 ){
-                throw std::out_of_range("Note(string) : input string ("+str+") is too short");
+        // Returns note at degree on scale 
+        Note scale_degree(scale_type::name type, int degree){
+            int interval = scale_type::table[type][degree-1];
+            if(interval > 0){
+                return Note(this->index+interval);
             }
-
-            if(regex_match(toParse.substr(0,1), note_regex)){
-                ret.note = toParse[0];
-                if(toParse.length() == 1){
-                    ret.sign = 'n';
-                    ret.octave = 4;
-                    return ret;
-                }
-                toParse = toParse.substr(1);
-            }
-            else{
-                throw std::out_of_range("Note(string) : input string ("+str+") is invalid (First char is not valid note)");
-            }
-
-            if(regex_match(toParse.substr(0,1), sign_regex)){
-                ret.sign = toParse[0];
-                if(toParse.length() == 1){
-                    ret.octave = 4;
-                    return ret;
-                }
-                
-                toParse = toParse.substr(1);
-            }
-
-            if(regex_match(toParse, octave_regex)){
-                if(toParse[0] == '-'){
-                    ret.octave = -1*atoi(&toParse[1]);
-                    return ret;
-                }
-                else{
-                    ret.octave = atoi(&toParse[0]);
-                    return ret;
-                }
-            }
-
-            throw std::out_of_range("Note(string) : input string ("+str+") is invalid EoF");
-        }
-
-        // takes parsed string input
-        // returns midi index if valid
-        static int parsedToMidi(Note::parsed_string parsed){
-            std::regex note_regex("[a-gA-G]");
-            std::regex sign_regex("[#nb]");
-            
-            // Validate input
-            assert(regex_match(std::to_string(parsed.note), note_regex));
-            assert(regex_match(std::to_string(parsed.sign), sign_regex));
-            assert(parsed.octave > -1 && parsed.octave < 9);
-            
-            int octDist = (parsed.octave-4)*12;
-            int noteDist = 0;
-
-            switch(parsed.note){
-                case 'C': case 'c':
-                    noteDist = -9;
-                    break;
-                case 'D': case 'd':
-                    noteDist = -7;
-                    break;
-                case 'E': case 'e':
-                    noteDist = -5;
-                    break;
-                case 'F': case 'f':
-                    noteDist = -4;
-                    break;
-                case 'G': case 'g':
-                    noteDist = -2;
-                    break;
-                case 'A': case 'a':
-                    noteDist = 0;
-                    break;
-                case 'B': case 'b':
-                    noteDist = 2;
-                    break;
-            }
-            if(parsed.sign == 'b') noteDist -= 1;
-            else if(parsed.sign == '#') noteDist += 1;
-
-            return octDist + noteDist + 69;
-        }
-
-        static std::string midiToString(int midi, char signPref='b', bool withOctave=true){
-            if(midi > 127 || midi <0){
-                throw std::out_of_range("Note(midi) : midi index ("+std::to_string(midi)+") is out of range");
-            } 
-            int noteIdx = midi%12;
-            int octave = ((midi-noteIdx)/12)-1;
-            char letter;
-            char sign = 'n';
-            
-            switch(noteIdx){
-                case 0:
-                    letter = 'C';
-                    break;
-                case 1:
-                    if(signPref=='#'){
-                        letter='C';
-                        sign='#';
-                    }
-                    else{
-                        letter='D';
-                        sign='b';
-                    }
-                    break;
-                case 2:
-                    letter = 'D';
-                    break;
-                case 3:
-                    if(signPref=='#'){
-                        letter='D';
-                        sign='#';
-                    }
-                    else{
-                        letter='E';
-                        sign='b';
-                    }
-                    break;
-                case 4:
-                    letter = 'E';
-                    break;
-                case 5:
-                    letter = 'F';
-                    break;
-                case 6:
-                    if(signPref=='#'){
-                        letter='F';
-                        sign='#';
-                    }
-                    else{
-                        letter='G';
-                        sign='b';
-                    }
-                    break;
-                case 7:
-                    letter = 'G';
-                    break;
-                case 8:
-                    if(signPref=='#'){
-                        letter='G';
-                        sign='#';
-                    }
-                    else{
-                        letter='A';
-                        sign='b';
-                    }
-                    break;
-                case 9:
-                    letter = 'A';
-                    break;
-                case 10:
-                    if(signPref=='#'){
-                        letter='A';
-                        sign='#';
-                    }
-                    else{
-                        letter='B';
-                        sign='b';
-                    }
-                    break;
-                case 11:
-                    letter = 'B';
-                    break;
-            }
-
-            std::string ret;
-            ret += letter;
-            if(sign == 'b' || sign=='#') ret += sign;
-            if(withOctave) ret += std::to_string(octave);
-
-            return ret;
+            else return Note(this->index);
         }
 
         
+
 
 };
 
-/*
-example use: modulate key and octave
+// ------------------------------------------------------------------
+//      Static Methods
+// ------------------------------------------------------------------     
 
-playSong(key, sign, octave){
-    root = Note(key, sign, octave)
-    third = root.interval("M3")
+    static Note scale_degree(Note::notelist scale, scale_type::degree degree){
+            return scale[degree];
+        }
+
+    static Note::notelist dropChord(Note::notelist chord, int numOctaves=1){
+        for(Note n:chord){
+            n.octaveDown();
+        }
+        return chord;
+    }
+    
+    static Note::notelist invertChord(Note::notelist chord, int inversion=0){
+        for(int i=0; i<inversion; i++){
+            int newIdx = chord[0].index+12;
+            if(newIdx > 127){
+                chord = dropChord(chord);
+                newIdx = chord[0].index+12;
+            }
+            std::rotate(chord.begin(), chord.begin() + 1, chord.end());
+        }
+
+        return chord;
+    }
+
+    static Note::notelist chord(Note* root, std::string name, int octave=3){
+        Note::notelist ret;
+
+        helper::parsed_chord parsed = helper::parseChord(name);
+        Note rt = Note(root->midi());
+        rt.setOctave(octave);
+        int rootIdx = rt.midi();
+
+        for(int interval:parsed.intervals){
+            ret.push_back(Note(rootIdx + interval));
+        }
+
+        if(parsed.bass != parsed.key){
+            int bassNote = helper::noteIndex(parsed.bass);
+            int bassIdx = -1;
+            for(int i=0; i<ret.size(); i++){
+                int noteLoc = helper::noteIndex(ret[i].key());
+                if(noteLoc == bassNote){
+                    bassIdx = i;
+                }
+            }
+            if(bassIdx == -1){
+                throw std::out_of_range("Chord(string) : Figured bass ("+parsed.bass+") is not in chord");
+            }
+            else{
+                std::cout << "Inversion=" << bassIdx << std::endl;
+                ret = invertChord(ret, bassIdx);
+            }
+        }
+
+
+        std::cout << "\nNotes: ";
+        for(Note n:ret){
+            std::cout << n.key() << ", ";
+        }
+
+        return ret;
+    }
+
+    static Note::notelist chord(std::string name, int octave=3){
+        Note::notelist ret;
+
+        helper::parsed_chord parsed = helper::parseChord(name);
+        Note root = Note(parsed.key+parsed.sign);
+        root.setOctave(octave);
+        int rootIdx = root.midi();
+
+        for(int interval:parsed.intervals){
+            ret.push_back(Note(rootIdx + interval));
+        }
+
+        if(parsed.bass != parsed.key){
+            int bassNote = helper::noteIndex(parsed.bass);
+            int bassIdx = -1;
+            for(int i=0; i<ret.size(); i++){
+                int noteLoc = helper::noteIndex(ret[i].key());
+                if(noteLoc == bassNote){
+                    bassIdx = i;
+                }
+            }
+            if(bassIdx == -1){
+                throw std::out_of_range("Chord(string) : Figured bass ("+parsed.bass+") is not in chord");
+            }
+            else{
+                std::cout << "Inversion=" << bassIdx << std::endl;
+                ret = invertChord(ret, bassIdx);
+            }
+        }
+
+
+        std::cout << "\nNotes: ";
+        for(Note n:ret){
+            std::cout << n.key() << ", ";
+        }
+
+        return ret;
+    }
+
+    Note::notelist Note::chord(std::string chord_name, int octave){
+        return theory::chord(this, octave);
+    }
+    
+    // Returns chord (vector of notes) based on root name and chord type
+    //  e.g. getChord("Db5", chord_type::Maj7)
+    // static chord getChord(std::string note, chord_type::name type, int inversion=0){
+    //     return Note(note).getChord(type, inversion);
+    // }
+
+    // // Returns chord (vector of notes) based on root name and chord type
+    // //  e.g. 
+    // //    Note root = Note("Db5") 
+    // //    getChord(root, chord_type::Maj7)
+    // static chord getChord(Note note, chord_type::name type, int inversion=0){
+    //     return note.getChord(type, inversion);
+    // }
+
+
+
+    static Note::notelist getTriad(Note::notelist scale, scale_type::degree degree, int inversion){
+        Note::notelist ret;
+        if(degree > scale.size()){
+            throw std::out_of_range("Scale Degree ("+scale_type::degree_labels[degree]+") is out of range");
+        }
+
+        Note root = Note(scale[degree].midi());
+        ret.push_back(root);
+        Note third = Note(scale[(degree+2)%scale.size()].midi());
+        ret.push_back(third);
+        Note fifth = Note(scale[(degree+4)%scale.size()].midi());
+        ret.push_back(fifth);
+        return ret;
+    }
+
+    
+
+    // Returns scale (vector of notes) based on tonic note and scale type
+    static Note::notelist scale(Note tonic, scale_type::name type){
+        Note::notelist ret;
+
+        // loop through chord intervals to build list of notes
+        for(int i=0; i<scale_type::maxLength; i++){
+            int interval = scale_type::table[type][i];
+            if(interval >= 0 ){ // variable length scales, fixed length array, filled space with -1s
+                int idx = tonic.index + interval;
+                Note cnote = Note(idx);
+                ret.push_back(cnote);
+            }
+        }
+
+        return ret;
+    }
+
+    // Returns scale (vector of notes) based on tonic name and scale type
+    //  e.g. getScale("A2", scale_type::HarmonicMajor)
+    static Note::notelist scale(std::string note, scale_type::name type){
+        return scale(Note(note), type);
+    }
+
+typedef interval_type::name intervalT;
+typedef scale_type::name scaleT;
+typedef scale_type::degree degree;
+typedef chord_type::quality qualityT;
+typedef Note::notelist notelist;
+
 }
 
---------------------------------------------------
-
-example use: 2-5-1 progression
-
-root = Note("C")
-two = root.interval("M2")  < defined by interval so root is flexible
-five = root.interval("P5")
-
-rootChord[] = root.chord(Maj7)
-twoChord[] = two.chord(min7)
-fiveChord[] = five.chord(Dom7)
-
-rootEmbellish[] = root.scale(Pent)
-twoEmbellish[] = two.scale(Pent)
-
-playSequence(time){
-    time = playChord(twoChord, time)
-    time = playChord(fiveChord, time)
-    time = playChord(rootChord, time)
-    time = playChord(rootChord, time)
-}
-
-playChord(chord, time){
-    for note in chord
-        playSound(time, note.frequency(), duration, ...)
-    return time+length
-}
-
---------------------------------------------------*/

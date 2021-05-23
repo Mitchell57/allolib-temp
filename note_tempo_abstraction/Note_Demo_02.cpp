@@ -17,6 +17,12 @@
 
 // using namespace gam;
 using namespace al;
+using namespace theory;
+
+
+
+
+
 
 // This example shows how to use SynthVoice and SynthManagerto create an audio
 // visual synthesizer. In a class that inherits from SynthVoice you will
@@ -167,18 +173,6 @@ public:
     case 's':
       playHappyBirthday(Note("G3"), 120);
       return false;
-    case '1':
-        playChord(0, Note("C4").chord(Note::Maj), 1.0, true);
-        return false;
-    case '2':
-        playChord(0, Note("C4").interval(Note::P5).chord(Note::Maj), 1.0, true);
-        return false;
-    case '3':
-        playChord(0, Note("C4").chord(Note::Dom7), 1.0, true);
-        return false;
-    case '4':
-        playChord(0, Note("A4").chord(Note::Maj11), 1.0, true);
-        return false;
 
     
     }
@@ -223,22 +217,23 @@ public:
 
   void playHappyBirthday(Note root, float bpm)
   {
+    
     // Happy birthday uses: P1(C), M2(D), M3(E), P4(F), P5(G), M6(A), and m7(Bb)
-    std::vector<Note> majScale = root.scale(Note::Major);
-    Note M2 = majScale[1];
-    Note M3 = majScale[2];
-    Note P4 = majScale[3];
-    Note P5 = majScale[4];
-    Note M6 = majScale[5];
-    Note m7 = root.interval(Note::m7);
-    Note P8 = majScale[7];
+    notelist majScale = scale(root, scaleT::Major);
+    Note M2 = scale_degree(majScale, degree::II);
+    Note M3 = scale_degree(majScale, degree::III);
+    Note P4 = scale_degree(majScale, degree::IV);
+    Note P5 = scale_degree(majScale, degree::V);
+    Note M6 = scale_degree(majScale, degree::VI);
+    Note m7 = root.interval(intervalT::m7);
+    Note P8 = scale_degree(majScale, degree::VIII);
 
     // For chords it needs: F Maj, C Dom7, Bb Maj, F/C (2nd inversion)
     // (Also dropping the root of the chord down an octave or Perfect Eighth)
-    std::vector<Note> chord1 = P4.interval(Note::P8, -1).chord(Note::Maj);
-    std::vector<Note> chord2 = root.interval(Note::P8, -1).chord(Note::Dom7);
-    std::vector<Note> chord3 = m7.interval(Note::P8, -1).chord(Note::Maj);
-    std::vector<Note> chord4 = P4.interval(Note::P8, -1).chord(Note::Maj, 2); // 2nd inversion
+    notelist chord1 = chord(P4.interval(12), "maj");
+    notelist chord2 = root.chord("7");
+    notelist chord3 = chord(m7.interval(-12), "maj");
+    notelist chord4 = chord("F/C"); // 2nd inversion
 
     // Now lets set up a tempo
     //  syntax: Tempo(bpm, timeSig top, timeSig bottom)

@@ -22,7 +22,6 @@ class Tempo{
             eighth=3, e=3,
             sixteenth=4, s=4,
             thirtysecond=5, t=5,
-
         };
 
         timeSignature timeSig;
